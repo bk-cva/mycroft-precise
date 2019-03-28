@@ -23,12 +23,11 @@ from precise.network_runner import Listener
 from precise.util import save_audio, buffer_to_audio, activate_notify
 from precise_runner import PreciseRunner
 from precise_runner.runner import ListenerEngine
+from termcolor import colored
+
 
 usage = '''
     Run a model on microphone audio input
-    
-    :model str
-        Either Keras (.net) or TensorFlow (.pb) model to run
     
     :-c --chunk-size int 2048
         Samples between inferences
@@ -45,6 +44,10 @@ usage = '''
 
 session_id, chunk_num = '%09d' % randint(0, 999999999), 0
 
+threshold_detect = 3
+detect_count = 0
+
+detecting_flag = False
 
 def main():
     args = create_parser(usage).parse_args()
@@ -59,11 +62,18 @@ def main():
             print()
             print('Saved to ' + nm + '.')
             chunk_num += 1
-
+    
     def on_prediction(conf):
-        print('!' if conf > 0.5 else '.', end='', flush=True)
+        global detecting_flag
+        # print('!' if conf > 0.5 else '.', end='', flush=True)
+        if conf > 0.5:
+            detecting_flag = True
+        if conf < 0.5 and detecting_flag:
+            print(colored("Yeah! I'm Here.", 'green'))
+            detecting_flag = False
 
-    listener = Listener(args.model, args.chunk_size)
+    sunshine_model = './ok-sunshine.net'
+    listener = Listener(sunshine_model, args.chunk_size)
     audio_buffer = np.zeros(listener.pr.buffer_samples, dtype=float)
 
     def get_prediction(chunk):
