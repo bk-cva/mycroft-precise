@@ -32,3 +32,15 @@ __pycache__/
 /all/
 /mycroft-precise/
 /models/
+
+# jupyter notebook
+.ipynb_checkpoints/
+
+# data
+data/
+!data/activate.wav
+precise-data/
+model-weights/
+
+# library
+list/
