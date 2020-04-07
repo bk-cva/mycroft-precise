@@ -25,6 +25,7 @@ from precise.network_runner import Listener
 from precise.scripts.base_script import BaseScript
 from precise.util import save_audio, buffer_to_audio, activate_notify
 
+from nlp_service import nlp_task
 
 class ListenScript(BaseScript):
     usage = Usage('''
@@ -61,9 +62,12 @@ class ListenScript(BaseScript):
         self.runner = PreciseRunner(self.engine, args.trigger_level, sensitivity=args.sensitivity,
                                     on_activation=self.on_activation, on_prediction=self.on_prediction)
         self.session_id, self.chunk_num = '%09d' % randint(0, 999999999), 0
+        self.event = Event()
 
     def on_activation(self):
         activate_notify()
+        self.event.set()
+        nlp_task()
 
         if self.args.save_dir:
             nm = join(self.args.save_dir, self.args.save_prefix + self.session_id + '.' + str(self.chunk_num) + '.wav')
@@ -82,6 +86,7 @@ class ListenScript(BaseScript):
             bar = 'X' * units + '-' * (width - units)
             cutoff = round((1.0 - self.args.sensitivity) * width)
             print(bar[:cutoff] + bar[cutoff:].replace('X', 'x'))
+            # print(conf)
 
     def get_prediction(self, chunk):
         audio = buffer_to_audio(chunk)
@@ -90,7 +95,7 @@ class ListenScript(BaseScript):
 
     def run(self):
         self.runner.start()
-        Event().wait()  # Wait forever
+        self.event.wait()  # Wait forever
 
 
 main = ListenScript.run_main
