@@ -15,6 +15,7 @@
 from select import select
 from sys import stdin
 from termios import tcsetattr, tcgetattr, TCSADRAIN
+import time
 
 import tty
 import wave
@@ -52,6 +53,7 @@ def save_audio(name, data, args):
 class CollectScript(BaseScript):
     RECORD_KEY = ' '
     EXIT_KEY_CODE = 27
+    TRIGGER_KEY = 106
 
     usage = Usage('''
         Record audio samples for use with precise
@@ -71,6 +73,8 @@ class CollectScript(BaseScript):
         super().__init__(args)
         self.orig_settings = tcgetattr(stdin)
         self.p = PyAudio()
+        self.start_time = time.time()
+        self.trigger_track_file = None
 
     def key_pressed(self):
         return select([stdin], [], [], 0) == ([stdin], [], [])
@@ -113,7 +117,19 @@ class CollectScript(BaseScript):
 
     def record_until_key(self):
         def should_return():
-            return self.key_pressed() and stdin.read(1) == self.RECORD_KEY
+            if self.key_pressed():
+                c = stdin.read(1)
+                if c == self.RECORD_KEY:
+                    self.trigger_track_file.close()
+                    return 1
+                if ord(c) == self.TRIGGER_KEY:
+                    time_trigger = time.time() - self.start_time
+                    minute = int(time_trigger/60)
+                    second = int(time_trigger%60)
+                    print(time_trigger)
+                    self.trigger_track_file.write(str(time_trigger) + '\n')
+                    return 0
+            else: return 0
 
         return record_until(self.p, should_return, self.args)
 
@@ -126,13 +142,16 @@ class CollectScript(BaseScript):
 
         while True:
             print('Press space to record (esc to exit)...')
-
             if not self.wait_to_continue():
                 break
 
             print('Recording...')
-            d = self.record_until_key()
+            self.start_time = time.time()
+            print('Press "j" to save time of trigger')
             name = self.next_name(args.file_label)
+            print(name)
+            self.trigger_track_file = open(name[:-4] + ".txt", "a")
+            d = self.record_until_key()
             save_audio(name, d, args)
             print('Saved as ' + name)
 
