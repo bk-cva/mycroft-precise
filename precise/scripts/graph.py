@@ -133,9 +133,18 @@ class GraphScript(BaseScript):
             ))
             model_data = calc_stats(args.models, loader, args.use_train, filenames)
         else:
-            model_data = {
-                name: Stats.from_np_dict(data) for name, data in np.load(args.input_file)['data'].item().items()
-            }
+            np_load_old = np.load
+            np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
+            input_file_list = args.input_file.split(',')
+            model_data_list = []
+            for input_file in input_file_list:
+                model_data = {
+                    name: Stats.from_np_dict(data) for name, data in np.load(input_file)['data'].item().items()
+                }
+                model_data_list.append(model_data)
+
+            np.load = np_load_old
+
             for name, stats in model_data.items():
                 print('=== {} ===\n{}\n\n{}\n'.format(name, stats.counts_str(), stats.summary_str()))
 
@@ -145,13 +154,23 @@ class GraphScript(BaseScript):
             plt = load_plt()
             decoder = ThresholdDecoder(pr.threshold_config, pr.threshold_center)
             thresholds = [decoder.encode(i) for i in np.linspace(0.0, 1.0, args.resolution)[1:-1]]
-            for model_name, stats in model_data.items():
-                x = [stats.false_positives(i) for i in thresholds]
-                y = [stats.false_negatives(i) for i in thresholds]
-                plt.plot(x, y, marker='x', linestyle='-', label=model_name)
-                if args.labels:
-                    for x, y, threshold in zip(x, y, thresholds):
-                        plt.annotate('{:.4f}'.format(threshold), (x, y))
+            if args.input_file:
+                for model_data in model_data_list:
+                    for model_name, stats in model_data.items():
+                        x = [stats.false_positives(i) for i in thresholds]
+                        y = [stats.false_negatives(i) for i in thresholds]
+                        plt.plot(x, y, linestyle='-', label=model_name)
+                        if args.labels:
+                            for x, y, threshold in zip(x, y, thresholds):
+                                plt.annotate('{:.4f}'.format(threshold), (x, y))
+            else:
+                for model_name, stats in model_data.items():
+                    x = [stats.false_positives(i) for i in thresholds]
+                    y = [stats.false_negatives(i) for i in thresholds]
+                    plt.plot(x, y, marker='.', linestyle='-', label=model_name)
+                    if args.labels:
+                        for x, y, threshold in zip(x, y, thresholds):
+                            plt.annotate('{:.4f}'.format(threshold), (x, y))
 
             plt.legend()
             plt.xlabel('False Positives')
