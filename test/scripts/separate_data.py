@@ -4,15 +4,17 @@ import glob
 
 from sklearn.model_selection import train_test_split
 
-list_data_folder = ['wwRandDb-randPos-noise_low_SNR', \
-                    'wwRandDb-center-noise_high_SNR', \
-                    'wwRandDb-randPos', \
-                    'wwRandDb-center']
+# list_data_folder = ['wwRandDb-randPos-noise_low_SNR', \
+#                     'wwRandDb-center-noise_high_SNR', \
+#                     'wwRandDb-randPos', \
+#                     'wwRandDb-center']
 
-list_data_path = [os.path.join('./data/enhenced', f) for f in list_data_folder]
+list_data_folder = ['speech-command/marvin']
 
-train_path = './data/hey-sunshine-enhenced/wake-word'
-test_path = './data/hey-sunshine-enhenced/test/wake-word'
+list_data_path = [os.path.join('./data', f) for f in list_data_folder]
+
+train_path = './data/marvin/wake-word'
+test_path = './data/marvin/test/wake-word'
 
 def clean_folder(folder):
     for filename in os.listdir(folder):
