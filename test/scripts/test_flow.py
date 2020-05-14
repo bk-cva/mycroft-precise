@@ -134,4 +134,4 @@ if __name__ == '__main__':
         vector = info.get_vectorize_audio()
         vector_input = np.expand_dims(vector, axis=0)
         prob = info.get_predict(vector_input)
-        print(prob)
+        print("Predict probability: ', prob)
