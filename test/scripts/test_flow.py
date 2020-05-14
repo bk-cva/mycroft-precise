@@ -84,7 +84,7 @@ if __name__ == '__main__':
         help='Pretrained model'
     )
     parser.add_argument(
-        '--audio-file',
+        '--audio_file',
         type=str,
         default='./data/test-data/test_audio.wav',
         help='File audio to get information'
