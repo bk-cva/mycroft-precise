@@ -84,7 +84,7 @@ class Vectorizer:
 
 # Global listener parameters
 pr = ListenerParams(
-    window_t=0.1, hop_t=0.05, buffer_t=1.5, sample_rate=16000,
+    window_t=0.04, hop_t=0.02, buffer_t=1.5, sample_rate=16000,
     sample_depth=2, n_mfcc=13, n_filt=20, n_fft=512, use_delta=False,
     threshold_config=((6, 4),), threshold_center=0.2, vectorizer=Vectorizer.mfccs
 )
@@ -109,3 +109,13 @@ def save_params(model_name: str):
     """Save current global listener params to a file"""
     with open(model_name + '.params', 'w') as f:
         json.dump(pr.__dict__, f)
+
+
+if __name__ == '__main__':
+    keys = sorted(pr.__dict__)
+    a = hashlib.md5(
+            str([pr.__dict__[i] for i in keys]).encode()
+        ).hexdigest()
+    print(keys)
+    print(str([pr.__dict__[i] for i in keys]).encode())
+    print([pr.__dict__[i] for i in keys])
