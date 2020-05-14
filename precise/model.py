@@ -66,18 +66,63 @@ def create_model(model_name: Optional[str], params: ModelParams) -> 'Sequential'
         from keras.layers.core import Dense
         from keras.layers.recurrent import GRU
         from keras.models import Sequential
+        from keras.layers import Conv1D, Conv2D, MaxPooling1D, \
+                                MaxPooling2D, Reshape, TimeDistributed, \
+                                Dropout, LeakyReLU, Flatten
 
+
+        input_shape = (pr.n_features, pr.feature_size)
+
+        # model = Sequential()
+        # model.add(GRU(
+        #     32, activation='relu',
+        #     input_shape=(pr.n_features, pr.feature_size), dropout=params.dropout, name='net'))
+        # model.add(Dense(1, activation='sigmoid'))
+
+        # model = Sequential()
+        # model.add(GRU(
+        #     32, activation='relu',
+        #     input_shape=(pr.n_features, pr.feature_size), dropout=params.dropout, name='net',
+        #     return_sequences=True))
+        # model.add(GRU(
+        #     20, activation='relu', dropout=params.dropout))
+        # model.add(Dense(1, activation='sigmoid'))
+
+        ## 2xCNN + GRU model
+        # model = Sequential()
+        # model.add(Reshape((pr.n_features, pr.feature_size, 1), input_shape=input_shape))
+        # model.add(Conv2D(64, (8,20), padding='same', activation='relu'))
+        # model.add(Dropout(0.2))
+        # model.add(MaxPooling2D(2, 2, 'same'))
+        # model.add(Conv2D(64, (4,10), padding='same', activation='relu'))
+        # model.add(Dropout(0.2))
+        # model.add(Flatten())
+        # # model.add(GRU(128,activation='relu', dropout=0.2))
+        # model.add(Dense(16, activation='relu'))
+        # # model.add(Dense(32))
+        # model.add(Dense(1, activation='sigmoid'))
+
+        ## CRNN
         model = Sequential()
-        model.add(GRU(
-            params.recurrent_units, activation='linear',
-            input_shape=(pr.n_features, pr.feature_size), dropout=params.dropout, name='net'
-        ))
+        model.add(Reshape((pr.n_features, pr.feature_size, 1), input_shape=input_shape))
+        model.add(Conv2D(48, kernel_size=(10, 4), strides=2, padding='valid', activation='relu'))
+        model.add(Dropout(params.dropout))
+        model.add(MaxPooling2D(2, 2, 'same'))
+        model.add(Reshape((17, 3*48)))
+        model.add(GRU(32, activation='relu', dropout=params.dropout, \
+                    return_sequences=True))
+        model.add(GRU(32,activation='relu', dropout=params.dropout))
+        model.add(Dense(16, activation='relu'))
+        model.add(Dropout(params.dropout))
         model.add(Dense(1, activation='sigmoid'))
 
+
+    from keras.optimizers import Adam
     load_keras()
     metrics = ['accuracy'] + params.extra_metrics * [false_pos, false_neg]
     set_loss_bias(params.loss_bias)
     for i in model.layers[:params.freeze_till]:
         i.trainable = False
-    model.compile('rmsprop', weighted_log_loss, metrics=(not params.skip_acc) * metrics)
+    optimizer = Adam(lr=0.0005)
+    model.compile(optimizer, weighted_log_loss, metrics=(not params.skip_acc) * metrics)
     return model
