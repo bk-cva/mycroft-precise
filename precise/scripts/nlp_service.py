@@ -49,7 +49,8 @@ YELLOW = '\033[0;33m'
 
 #  NLP Endpoint server
 
-NLP_URL = 'http://213.246.38.101:5200/analyze'
+NLP_URL = 'http://192.168.1.151:5000/cva'
+
 
 def get_current_time():
     """Return Current Time in MS."""
@@ -133,7 +134,7 @@ class ResumableMicrophoneStream:
 
                     self.bridging_offset = (round((
                         len(self.last_audio_input) - chunks_from_ms)
-                                                  * chunk_time))
+                        * chunk_time))
 
                     for i in range(chunks_from_ms, len(self.last_audio_input)):
                         data.append(self.last_audio_input[i])
@@ -221,12 +222,12 @@ def listen_print_loop(responses, stream):
             sys.stdout.write('\033[K')
             sys.stdout.write(str(corrected_time) + ': ' + transcript + '\n')
 
-            data = {'texts':[transcript]}
+            data = {'topic': "request_cva",
+                    'user_id': '1',
+                    'utterance': transcript}
             nlp_response = requests.post(NLP_URL, json=data)
             response_json = json.loads(nlp_response.text)
-            conversator = ConversationMaker(response_json)
-            response_text = conversator.process()
-            print(response_text)
+            print(response_json)
 
             stream.is_final_end_time = stream.result_end_time
             stream.last_transcript_was_final = True
@@ -247,6 +248,7 @@ def listen_print_loop(responses, stream):
             stream.last_transcript_was_final = False
 
     return transcript
+
 
 def nlp_task():
     """start bidirectional streaming from microphone input to speech API"""
@@ -324,15 +326,16 @@ class ConversationMaker:
         else:
             return 'Xin lỗi tôi chưa hiểu ý của bạn, tôi vẫn đang học thêm từng ngày'
 
+
 if __name__ == '__main__':
 
     nlp_task()
-    # data ={'texts': ['đói bung quá bạn ơi']}
-    # nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
-    # print(nlp_response)
-    # conversator = ConversationMaker(nlp_response)
-    # out = conversator.process()
-    # print(out)
+    data = {'topic': "request_cva",
+            'user_id': '1',
+            'utterance': 'tôi muốn đến trường đại học Bách Khoa'
+            }
+    nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
+    print(nlp_response)
 
 
 # [END speech_transcribe_infinite_streaming]
