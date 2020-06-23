@@ -33,10 +33,14 @@ import re
 import sys
 import requests
 import json
+import base64
 
 from google.cloud import speech
 import pyaudio
 from six.moves import queue
+import simpleaudio as sa
+
+from .text_to_speech import text_to_bytes
 
 # Audio recording parameters
 STREAMING_LIMIT = 10000  # 4 minutes
@@ -49,7 +53,7 @@ YELLOW = '\033[0;33m'
 
 #  NLP Endpoint server
 
-NLP_URL = 'http://192.168.1.151:5000/cva'
+NLP_URL = 'http://192.168.0.120:5000/cva'
 
 
 def get_current_time():
@@ -227,7 +231,9 @@ def listen_print_loop(responses, stream):
                     'utterance': transcript}
             nlp_response = requests.post(NLP_URL, json=data)
             response_json = json.loads(nlp_response.text)
-            print(response_json)
+            audio_data = text_to_bytes(response_json['response'][1])
+            play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
+            play_obj.wait_done()
 
             stream.is_final_end_time = stream.result_end_time
             stream.last_transcript_was_final = True
@@ -280,14 +286,15 @@ def nlp_task():
             stream.audio_input = []
             audio_generator = stream.generator()
 
-            requests = (speech.types.StreamingRecognizeRequest(
+            request = (speech.types.StreamingRecognizeRequest(
                 audio_content=content)for content in audio_generator)
 
             responses = client.streaming_recognize(streaming_config,
-                                                   requests)
+                                                   request)
 
             # Now, put the transcription responses to use.
             transcript = listen_print_loop(responses, stream)
+
 
             if stream.result_end_time > 0:
                 stream.final_request_end_time = stream.is_final_end_time
@@ -328,14 +335,15 @@ class ConversationMaker:
 
 
 if __name__ == '__main__':
-
     nlp_task()
-    data = {'topic': "request_cva",
-            'user_id': '1',
-            'utterance': 'tôi muốn đến trường đại học Bách Khoa'
-            }
-    nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
-    print(nlp_response)
-
+    # data = {'topic': "request_cva",
+    #         'user_id': '1',
+    #         'utterance': 'tôi muốn đến trường đại học Bách Khoa'
+    #         }
+    # nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
+    # print(nlp_response['response'][1])
+    # audio_data = text_to_bytes(nlp_response['response'][1])
+    # play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
+    # play_obj.wait_done()
 
 # [END speech_transcribe_infinite_streaming]
