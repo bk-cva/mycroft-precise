@@ -28,6 +28,7 @@ Example usage:
 
 # [START speech_transcribe_infinite_streaming]
 
+import os
 import time
 import re
 import sys
@@ -35,10 +36,14 @@ import requests
 import json
 import base64
 
-from google.cloud import speech
 import pyaudio
-from six.moves import queue
+import spotipy
+import urllib.request
+import  vlc
 import simpleaudio as sa
+from google.cloud import speech
+from six.moves import queue
+from spotipy.oauth2 import SpotifyClientCredentials
 
 from .text_to_speech import text_to_bytes
 
@@ -53,7 +58,7 @@ YELLOW = '\033[0;33m'
 
 #  NLP Endpoint server
 
-NLP_URL = 'http://192.168.0.120:5000/cva'
+NLP_URL = 'http://localhost:5000/cva'
 
 
 def get_current_time():
@@ -231,12 +236,24 @@ def listen_print_loop(responses, stream):
                     'utterance': transcript}
             nlp_response = requests.post(NLP_URL, json=data)
             response_json = json.loads(nlp_response.text)
+            print(response_json)
+
+            # Text to speech
             audio_data = text_to_bytes(response_json['response'][1])
             play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
             play_obj.wait_done()
 
             stream.is_final_end_time = stream.result_end_time
             stream.last_transcript_was_final = True
+
+            # Play music
+            conversator = ConversationProccessor(response_json)
+            has_song = conversator.play_music()
+            if not has_song:
+                notify_str = 'Không tìm thấy bài hát trong danh sách'
+                notify_audio = text_to_bytes(notify_str)
+                play_obj = sa.play_buffer(notify_audio, 1, 2, 16000)
+                play_obj.wait_done()
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
@@ -309,36 +326,43 @@ def nlp_task():
             stream.new_stream = True
 
 
-class ConversationMaker:
+class ConversationProccessor:
     def __init__(self, response):
-        self.result = response.get('results')[0]
-        self.intent = self.result.get('intent')
-        self.entity_list = self.result.get('entity')
+        self.response = response
+        self.state = response.get('response')[0]
+        self.intent = response.get('intent')
+        if self.intent == 'music' and response['action'] == 'respond_music':
+            self.song_name = response['metadata']['song_name']
 
-    def process(self):
-        if self.intent == 'path':
-            for e in self.entity_list:
-                if e.get('name') == 'place':
-                    place = e.get('value')
-                if e.get('name') == 'place_name':
-                    place_name = e.get('value')
-            return f'Được thôi tôi sẽ đưa bạn đến {place} {place_name}'
-        elif self.intent == 'schedule':
-            for e in self.entity_list:
-                if e.get('name') == 'date':
-                    date = e.get('value')
-                if e.get('name') == 'schedule_type':
-                    schedule_type = e.get('value')
-            return f'Được thôi tôi đang kiểm tra các {schedule_type} {date} của bạn'
-        else:
-            return 'Xin lỗi tôi chưa hiểu ý của bạn, tôi vẫn đang học thêm từng ngày'
+    def play_music(self):
+        if self.intent == 'music' and  self.response['action'] == 'respond_music':
+            os.environ['SPOTIPY_CLIENT_ID'] = 'e95d3002cf2e408ea7d4f5f34ea63b3c'
+            os.environ['SPOTIPY_CLIENT_SECRET'] = '5c213b772ebc4c01803f20d2a225fc28'
+            os.environ['SPOTIPY_REDIRECT_URI'] = 'http://localhost:8888'
+
+            spotify = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials())
+            result = spotify.search(self.song_name, limit=1)
+            print(result)
+            if not (result['tracks']['items'] and result['tracks']['items'][0]['preview_url']):
+                return False
+            preview_url = result['tracks']['items'][0]['preview_url']
+
+            player = vlc.MediaPlayer(preview_url)
+            player.play()
+            good_states = ["State.Playing", "State.NothingSpecial", "State.Opening"]
+            while str(player.get_state()) in good_states:
+                pass
+            print('Stream is not working. Current state = {}'.format(player.get_state()))
+            player.stop()
+            return True
+        return False
 
 
 if __name__ == '__main__':
     nlp_task()
     # data = {'topic': "request_cva",
     #         'user_id': '1',
-    #         'utterance': 'tôi muốn đến trường đại học Bách Khoa'
+    #         'utterance': 'tôi muốn đi siêu thị'
     #         }
     # nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
     # print(nlp_response['response'][1])
