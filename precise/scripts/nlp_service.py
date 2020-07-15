@@ -275,7 +275,7 @@ def listen_print_loop(responses, stream):
 
 def nlp_task():
     """start bidirectional streaming from microphone input to speech API"""
-
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './precise/scripts/Smart-Speaker-e00f3b0e6efb.json'
     client = speech.SpeechClient()
     config = speech.types.RecognitionConfig(
         encoding=speech.enums.RecognitionConfig.AudioEncoding.LINEAR16,
