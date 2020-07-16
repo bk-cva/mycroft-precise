@@ -58,7 +58,7 @@ YELLOW = '\033[0;33m'
 
 #  NLP Endpoint server
 
-NLP_URL = 'http://localhost:5000/cva'
+NLP_URL = 'http://118.69.144.206:5050/cva'
 
 
 def get_current_time():
@@ -287,7 +287,7 @@ def nlp_task():
         interim_results=True)
 
     mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
-    print(mic_manager.chunk_size)
+    # print(mic_manager.chunk_size)
     sys.stdout.write(YELLOW)
     sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
     sys.stdout.write('End (ms)       Transcript Results/Status\n')
@@ -355,7 +355,7 @@ class ConversationProccessor:
             print('Stream is not working. Current state = {}'.format(player.get_state()))
             player.stop()
             return True
-        return False
+        return True
 
 
 if __name__ == '__main__':
