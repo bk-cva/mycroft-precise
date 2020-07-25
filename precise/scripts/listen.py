@@ -25,7 +25,7 @@ from precise.network_runner import Listener
 from precise.scripts.base_script import BaseScript
 from precise.util import save_audio, buffer_to_audio, activate_notify
 
-from .nlp_service import nlp_task
+from .sequence_nlp_service import nlp_task
 
 class ListenScript(BaseScript):
     usage = Usage('''
@@ -66,8 +66,9 @@ class ListenScript(BaseScript):
 
     def on_activation(self):
         activate_notify()
-        self.event.set()
+        # self.event.set()
         nlp_task()
+        # self.event.set()
 
         if self.args.save_dir:
             nm = join(self.args.save_dir, self.args.save_prefix + self.session_id + '.' + str(self.chunk_num) + '.wav')

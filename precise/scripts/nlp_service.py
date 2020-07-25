@@ -37,8 +37,9 @@ import json
 import base64
 from time import sleep
 from enum import Enum
+import threading
 
-import RPi.GPIO as GPIO
+# import RPi.GPIO as GPIO
 import pyaudio
 import spotipy
 import urllib.request
@@ -51,9 +52,9 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from .text_to_speech import text_to_bytes
 
 # Audio recording parameters
-STREAMING_LIMIT = 10000  # 4 minutes
+STREAMING_LIMIT = 14000  # 240000  # 4 minutes
 SAMPLE_RATE = 16000
-CHUNK_SIZE = 2048   # int(SAMPLE_RATE / 10)  # 100ms
+CHUNK_SIZE = int(SAMPLE_RATE / 10)  # 100ms
 
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -73,8 +74,8 @@ class DeviceGPIO(Enum):
     RightDoor = 40
 
 
-GPIO.setwarnings(False)    # Ignore warning for now
-GPIO.setmode(GPIO.BOARD)   # Use physical pin numbering
+# GPIO.setwarnings(False)    # Ignore warning for now
+# GPIO.setmode(GPIO.BOARD)   # Use physical pin numbering
 
 
 def get_current_time():
@@ -140,6 +141,7 @@ class ResumableMicrophoneStream:
         """Stream Audio from microphone to API and to local buffer"""
 
         while not self.closed:
+            # print('reset data')
             data = []
 
             if self.new_stream and self.last_audio_input:
@@ -187,7 +189,7 @@ class ResumableMicrophoneStream:
 
                 except queue.Empty:
                     break
-
+            print(len(data))
             yield b''.join(data)
 
 
@@ -247,35 +249,48 @@ def listen_print_loop(responses, stream):
             sys.stdout.write('\033[K')
             sys.stdout.write(str(corrected_time) + ': ' + transcript + '\n')
 
-            data = {'topic': "request_cva",
-                    'user_id': '1',
-                    'utterance': transcript}
-            nlp_response = requests.post(NLP_URL, json=data)
-            response_json = json.loads(nlp_response.text)
-            print(response_json)
+            # # Pause stream
+            # print("Pausing stream")
+            # stream._audio_stream.stop_stream()
 
-            # Text to speech
-            audio_data = text_to_bytes(response_json['response'][1])
-            play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
-            play_obj.wait_done()
+            conversator_task = ConversationProccessor(transcript, stream)
+            conversator_task.start()
 
-            stream.is_final_end_time = stream.result_end_time
-            stream.last_transcript_was_final = True
 
-            # Play music
-            conversator = ConversationProccessor(response_json)
-            has_song = conversator._play_music()
-            if not has_song:
-                notify_str = 'Không tìm thấy bài hát trong danh sách'
-                notify_audio = text_to_bytes(notify_str)
-                play_obj = sa.play_buffer(notify_audio, 1, 2, 16000)
-                play_obj.wait_done()
+            # data = {'topic': "request_cva",
+            #         'user_id': '1',
+            #         'utterance': transcript}
+            # nlp_response = requests.post(NLP_URL, json=data)
+            # response_json = json.loads(nlp_response.text)
+            # print(response_json)
 
-            conversator._control_car()
+            # # Text to speech
+            # audio_data = text_to_bytes(response_json['response'][1])
+            # play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
+            # play_obj.wait_done()
+
+            # stream.is_final_end_time = stream.result_end_time
+            # stream.last_transcript_was_final = True
+
+            # # Play music
+            # conversator = ConversationProccessor(response_json)
+            # has_song = conversator._play_music()
+            # if not has_song:
+            #     notify_str = 'Không tìm thấy bài hát trong danh sách'
+            #     notify_audio = text_to_bytes(notify_str)
+            #     play_obj = sa.play_buffer(notify_audio, 1, 2, 16000)
+            #     play_obj.wait_done()
+
+            print('done conversator')
+            # conversator._control_car()
+
+            # # Start stream again
+            # print('Starting stream again')
+            # stream._audio_stream.start_stream()
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
-            if re.search(r'\b(exit|quit)\b', transcript, re.I):
+            if re.search(r'\b(dừng|thoát|cám ơn|cảm ơn|ok)\b', transcript, re.I):
                 sys.stdout.write(YELLOW)
                 sys.stdout.write('Exiting...\n')
                 stream.closed = True
@@ -299,13 +314,14 @@ def nlp_task():
         encoding=speech.enums.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=SAMPLE_RATE,
         language_code='vi-VN',
-        max_alternatives=1)
+        max_alternatives=1,
+        use_enhanced=True)
     streaming_config = speech.types.StreamingRecognitionConfig(
         config=config,
-        interim_results=True)
+        interim_results=False,
+        single_utterance=False)
 
     mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
-    # print(mic_manager.chunk_size)
     sys.stdout.write(YELLOW)
     sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
     sys.stdout.write('End (ms)       Transcript Results/Status\n')
@@ -324,9 +340,10 @@ def nlp_task():
             request = (speech.types.StreamingRecognizeRequest(
                 audio_content=content)for content in audio_generator)
 
+            print('begin get response')
             responses = client.streaming_recognize(streaming_config,
                                                    request)
-
+            print('response done')
             # Now, put the transcription responses to use.
             transcript = listen_print_loop(responses, stream)
 
@@ -343,29 +360,41 @@ def nlp_task():
             stream.new_stream = True
 
 
-class ConversationProccessor:
-    def __init__(self, response):
-        self.response = response
-        self.state = response.get('response')[0]
-        self.intent = response.get('intent')
-        if self.intent == 'music' and response['action'] == 'respond_music':
-            self.song_name = response['metadata']['song_name']
-        self.devices_car = DeviceGPIO
-        for d in self.devices_car:
-            GPIO.setup(d.value, GPIO.OUT)
+class ConversationProccessor():
+    def __init__(self, transcript):
+        # threading.Thread.__init__(self)
+        self.transcript = transcript
+        # self.stream = stream
+
+    def _nlp_request(self):
+        data = {'topic': "request_cva",
+                'user_id': '1',
+                'utterance': self.transcript}
+        nlp_response = requests.post(NLP_URL, json=data)
+        self.response_json = json.loads(nlp_response.text)
+        print(self.response_json)
+        self.state = self.response_json.get('response')[0]
+        self.intent = self.response_json.get('intent')
+        if self.intent == 'music' and self.response_json['action'] == 'respond_music':
+            self.music_info = self.response_json['metadata'].get(
+                'song_name') or self.response_json['metadata'].get('music_genre')
+            print(self.music_info)
+        # self.devices_car = DeviceGPIO
+        # for d in self.devices_car:
+        #     GPIO.setup(d.value, GPIO.OUT)
 
     def _play_music(self):
-        if self.intent == 'music' and self.response['action'] == 'respond_music':
+        if self.intent == 'music' and self.response_json['action'] == 'respond_music':
             os.environ['SPOTIPY_CLIENT_ID'] = 'e95d3002cf2e408ea7d4f5f34ea63b3c'
             os.environ['SPOTIPY_CLIENT_SECRET'] = '5c213b772ebc4c01803f20d2a225fc28'
             os.environ['SPOTIPY_REDIRECT_URI'] = 'http://localhost:8888'
 
             spotify = spotipy.Spotify(
                 client_credentials_manager=SpotifyClientCredentials())
-            result = spotify.search(self.song_name, limit=1)
+            result = spotify.search(self.music_info, limit=1)
             print(result)
             if not (result['tracks']['items'] and result['tracks']['items'][0]['preview_url']):
-                return False
+                self._text_to_speech('Không tìm thấy bài hát trong danh sách')
             preview_url = result['tracks']['items'][0]['preview_url']
 
             player = vlc.MediaPlayer(preview_url)
@@ -377,8 +406,16 @@ class ConversationProccessor:
             print('Stream is not working. Current state = {}'.format(
                 player.get_state()))
             player.stop()
-            return True
-        return True
+
+    def _text_to_speech(self, text):
+        audio_data = text_to_bytes(text)
+        play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
+        play_obj.wait_done()
+
+    def _response_to_speech(self):
+        audio_data = text_to_bytes(self.response_json['response'][1])
+        play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
+        play_obj.wait_done()
 
     def _control_car(self):
         if self.intent == 'control_aircon':
@@ -389,7 +426,7 @@ class ConversationProccessor:
                         self.response['metadata']['action_type'])
         elif self.intent == 'control_door':
             if self.response['metadata']['side'] == -1:
-                GPIO.output([self.devices_car['LeftDoor'], self.devices_car['RightDoor']],
+                GPIO.output([self.devices_car['LeftDoor'].value, self.devices_car['RightDoor'].value],
                             self.response['metadata']['action_type'])
             else:
                 device_pin = self.devices_car['RightDoor'].value if self.response[
@@ -398,7 +435,7 @@ class ConversationProccessor:
                             self.response['metadata']['action_type'])
         elif self.intent == 'control_window':
             if self.response['metadata']['side'] == -1:
-                GPIO.output([self.devices_car['LeftWindow'], self.devices_car['RightWindow']],
+                GPIO.output([self.devices_car['LeftWindow'].value, self.devices_car['RightWindow'].value],
                             self.response['metadata']['action_type'])
             else:
                 device_pin = self.devices_car['RightWindow'].value if self.response[
@@ -406,24 +443,27 @@ class ConversationProccessor:
                 GPIO.output(device_pin,
                             self.response['metadata']['action_type'])
 
+    def run(self):
+        # self.stream._audio_stream.stop_stream()
+        print('begin nlp service')
+        self._nlp_request()
+        self._response_to_speech()
+        self._play_music()
+        # self.stream._audio_stream.start_stream()
 
 if __name__ == '__main__':
-    # nlp_task()
-    data = {'topic': "request_cva",
-            'user_id': '1',
-            'utterance': 'mở cửa bên trái'
-            }
-    nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
-    audio_data = text_to_bytes(nlp_response['response'][1])
-    play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
-    play_obj.wait_done()
-    conversator = ConversationProccessor(response_json)
-    has_song = conversator._play_music()
-    if not has_song:
-        notify_str = 'Không tìm thấy bài hát trong danh sách'
-        notify_audio = text_to_bytes(notify_str)
-        play_obj = sa.play_buffer(notify_audio, 1, 2, 16000)
-        play_obj.wait_done()
-    conversator._control_car()
+    nlp_task()
+    # utte = sys.argv[1]
+    # data = {'topic': "request_cva",
+    #         'user_id': '1',
+    #         'utterance': utte
+    #         }
+    # nlp_response = json.loads(requests.post(NLP_URL, json=data).text)
+    # audio_data = text_to_bytes(nlp_response['response'][1])
+    # play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
+    # play_obj.wait_done()
+    # print(nlp_response)
+    # conversator_task = ConversationProccessor(utte)
+    # conversator_task.start()
 
 # [END speech_transcribe_infinite_streaming]
