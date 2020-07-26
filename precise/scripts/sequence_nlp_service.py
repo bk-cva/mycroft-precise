@@ -4,6 +4,8 @@ import numpy as np
 import pyaudio
 import io
 import re
+import requests
+import json
 from queue import Queue
 
 import vlc
@@ -14,16 +16,16 @@ from google.cloud.speech import types
 from google.cloud import speech_v1
 from google.cloud.speech_v1 import enums
 
-from .nlp_service import ConversationProccessor
+from .nlp_service import ConversationProccessor, NLP_URL
 
 
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
-RECORD_SECONDS = 3
+RECORD_SECONDS = 5
 CHUNK_COUNT = RECORD_SECONDS*RATE/CHUNK
 SILENT_MESSAGE = 'Silent audio'
-TIMEOUT = 9
+TIMEOUT = 15
 MAX_SILENCES = TIMEOUT / RECORD_SECONDS
 
 queue = Queue()
@@ -70,15 +72,13 @@ def sample_recognize(content):
 
 def nlp_task(stream):
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './precise/scripts/Smart-Speaker-e00f3b0e6efb.json'
-    # pa = pyaudio.PyAudio()
-    # stream = pa.open(format=pyaudio.paInt16,
-    #                  channels=1,
-    #                  rate=RATE,
-    #                  input=True,
-    #                  output=False,
-    #                  frames_per_buffer=CHUNK)
 
     silent_count = 0
+
+    data = {"topic": "reset_cva"}
+    resp = json.loads(requests.post(NLP_URL, json=data).text)
+    assert resp['status'] == 'ok'
+
     while True:
         stream.start_stream()
         print("* recording")
@@ -105,8 +105,14 @@ def nlp_task(stream):
 
     stream.stop_stream()
     stream.close()
-    pa.terminate()
 
 
 if __name__ == "__main__":
-    nlp_task()
+    pa = pyaudio.PyAudio()
+    stream = pa.open(format=pyaudio.paInt16,
+                     channels=1,
+                     rate=RATE,
+                     input=True,
+                     output=False,
+                     frames_per_buffer=CHUNK)
+    nlp_task(stream)
