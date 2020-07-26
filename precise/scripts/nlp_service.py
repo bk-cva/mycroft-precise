@@ -39,7 +39,7 @@ from time import sleep
 from enum import Enum
 import threading
 
-# import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 import pyaudio
 import spotipy
 import urllib.request
@@ -103,8 +103,7 @@ class ResumableMicrophoneStream:
         self.bridging_offset = 0
         self.last_transcript_was_final = False
         self.new_stream = True
-        self._audio_interface = pyaudio.PyAudio()
-        self._audio_stream = self._audio_interface.open(
+        self._audio_interface = pyaudio.PyAudio(
             format=pyaudio.paInt16,
             channels=self._num_channels,
             rate=self._rate,
@@ -123,8 +122,6 @@ class ResumableMicrophoneStream:
 
     def __exit__(self, type, value, traceback):
 
-        self._audio_stream.stop_stream()
-        self._audio_stream.close()
         self.closed = True
         # Signal the generator to terminate so that the client's
         # streaming_recognize method will not block the process termination.
@@ -249,44 +246,10 @@ def listen_print_loop(responses, stream):
             sys.stdout.write('\033[K')
             sys.stdout.write(str(corrected_time) + ': ' + transcript + '\n')
 
-            # # Pause stream
-            # print("Pausing stream")
-            # stream._audio_stream.stop_stream()
-
             conversator_task = ConversationProccessor(transcript, stream)
             conversator_task.start()
-
-
-            # data = {'topic': "request_cva",
-            #         'user_id': '1',
-            #         'utterance': transcript}
-            # nlp_response = requests.post(NLP_URL, json=data)
-            # response_json = json.loads(nlp_response.text)
-            # print(response_json)
-
-            # # Text to speech
-            # audio_data = text_to_bytes(response_json['response'][1])
-            # play_obj = sa.play_buffer(audio_data, 1, 2, 16000)
-            # play_obj.wait_done()
-
-            # stream.is_final_end_time = stream.result_end_time
-            # stream.last_transcript_was_final = True
-
-            # # Play music
-            # conversator = ConversationProccessor(response_json)
-            # has_song = conversator._play_music()
-            # if not has_song:
-            #     notify_str = 'Không tìm thấy bài hát trong danh sách'
-            #     notify_audio = text_to_bytes(notify_str)
-            #     play_obj = sa.play_buffer(notify_audio, 1, 2, 16000)
-            #     play_obj.wait_done()
-
             print('done conversator')
             # conversator._control_car()
-
-            # # Start stream again
-            # print('Starting stream again')
-            # stream._audio_stream.start_stream()
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
@@ -379,9 +342,9 @@ class ConversationProccessor():
             self.music_info = self.response_json['metadata'].get(
                 'song_name') or self.response_json['metadata'].get('music_genre')
             print(self.music_info)
-        # self.devices_car = DeviceGPIO
-        # for d in self.devices_car:
-        #     GPIO.setup(d.value, GPIO.OUT)
+        self.devices_car = DeviceGPIO
+        for d in self.devices_car:
+            GPIO.setup(d.value, GPIO.OUT)
 
     def _play_music(self):
         if self.intent == 'music' and self.response_json['action'] == 'respond_music':
@@ -444,12 +407,11 @@ class ConversationProccessor():
                             self.response['metadata']['action_type'])
 
     def run(self):
-        # self.stream._audio_stream.stop_stream()
         print('begin nlp service')
         self._nlp_request()
         self._response_to_speech()
         self._play_music()
-        # self.stream._audio_stream.start_stream()
+        self._control_car()
 
 if __name__ == '__main__':
     nlp_task()

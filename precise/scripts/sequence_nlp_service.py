@@ -27,43 +27,12 @@ TIMEOUT = 9
 MAX_SILENCES = TIMEOUT / RECORD_SECONDS
 
 queue = Queue()
-samples = b''
 
 
 def audio_callback(in_data, frame_count, time_info, status):
     # data0 = np.frombuffer(in_data, dtype=np.int16) / np.iinfo(np.int16).max
     queue.put(in_data)
     return (in_data, pyaudio.paContinue)
-
-
-def print_transcript(responses):
-    num_chars_printed = 0
-
-    for response in responses:
-        if not response.results:
-            continue
-        result = response.results[0]
-        if not result.alternatives:
-            continue
-
-        transcript = result.alternatives[0].transcript
-
-        overwrite_chars = ' ' * (num_chars_printed - len(transcript))
-
-        if not result.is_final:
-            sys.stdout.write(transcript + overwrite_chars + '\r')
-            sys.stdout.flush()
-            num_chars_printed = len(transcript)
-
-        else:
-            print(transcript + overwrite_chars)
-            # conversator_task = ConversationProccessor(transcript, stream)
-            # conversator_task.start()
-
-            if re.search(r'\b(dừng|thoát|cám ơn|cảm ơn|ok)\b', transcript, re.I):
-                print('Exiting..')
-                break
-            num_chars_printed = 0
 
 
 def sample_recognize(content):
@@ -99,15 +68,15 @@ def sample_recognize(content):
     return SILENT_MESSAGE
 
 
-def nlp_task():
+def nlp_task(stream):
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './precise/scripts/Smart-Speaker-e00f3b0e6efb.json'
-    pa = pyaudio.PyAudio()
-    stream = pa.open(format=pyaudio.paInt16,
-                     channels=1,
-                     rate=RATE,
-                     input=True,
-                     output=False,
-                     frames_per_buffer=CHUNK)
+    # pa = pyaudio.PyAudio()
+    # stream = pa.open(format=pyaudio.paInt16,
+    #                  channels=1,
+    #                  rate=RATE,
+    #                  input=True,
+    #                  output=False,
+    #                  frames_per_buffer=CHUNK)
 
     silent_count = 0
     while True:
