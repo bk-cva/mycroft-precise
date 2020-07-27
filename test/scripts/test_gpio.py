@@ -21,7 +21,8 @@ for d in devices_car:
 
 while True: # Run forever
     for d in devices_car:
-    	GPIO.output([8, 10, 12], 0) # Turn on
-    	sleep(1)                  # Sleep for 1 second
-    	GPIO.output(d.value, GPIO.LOW)  # Turn off
+    	# GPIO.output([8, 10, 12], 1) # Turn on
+    	sleep(0.1)                  # Sleep for 1 second
+    	GPIO.output(d.value, GPIO.HIGH)  # Turn off
     	sleep(0.1)
+    	GPIO.output(d.value, GPIO.LOW)  # Turn off
