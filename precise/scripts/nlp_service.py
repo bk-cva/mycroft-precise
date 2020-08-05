@@ -342,6 +342,9 @@ class ConversationProccessor():
             self.music_info = self.response_json['metadata'].get(
                 'song_name') or self.response_json['metadata'].get('music_genre')
             print(self.music_info)
+
+        GPIO.setwarnings(False)    # Ignore warning for now
+        GPIO.setmode(GPIO.BOARD)   # Use physical pin numbering
         self.devices_car = DeviceGPIO
         for d in self.devices_car:
             GPIO.setup(d.value, GPIO.OUT)
@@ -383,28 +386,28 @@ class ConversationProccessor():
     def _control_car(self):
         if self.intent == 'control_aircon':
             GPIO.output(self.devices_car['Aircon'].value,
-                        self.response['metadata']['action_type'])
+                        self.response_json['metadata']['action_type'])
         elif self.intent == 'control_radio':
             GPIO.output(self.devices_car['Radio'].value,
-                        self.response['metadata']['action_type'])
+                        self.response_json['metadata']['action_type'])
         elif self.intent == 'control_door':
-            if self.response['metadata']['side'] == -1:
+            if self.response_json['metadata']['side'] == -1:
                 GPIO.output([self.devices_car['LeftDoor'].value, self.devices_car['RightDoor'].value],
-                            self.response['metadata']['action_type'])
+                            self.response_json['metadata']['action_type'])
             else:
-                device_pin = self.devices_car['RightDoor'].value if self.response[
+                device_pin = self.devices_car['RightDoor'].value if self.response_json[
                     'metadata']['side'] else self.devices_car['LeftDoor'].value
                 GPIO.output(device_pin,
-                            self.response['metadata']['action_type'])
+                            self.response_json['metadata']['action_type'])
         elif self.intent == 'control_window':
-            if self.response['metadata']['side'] == -1:
+            if self.response_json['metadata']['side'] == -1:
                 GPIO.output([self.devices_car['LeftWindow'].value, self.devices_car['RightWindow'].value],
-                            self.response['metadata']['action_type'])
+                            self.response_json['metadata']['action_type'])
             else:
-                device_pin = self.devices_car['RightWindow'].value if self.response[
+                device_pin = self.devices_car['RightWindow'].value if self.response_json[
                     'metadata']['side'] else self.devices_car['LeftWindow'].value
                 GPIO.output(device_pin,
-                            self.response['metadata']['action_type'])
+                            self.response_json['metadata']['action_type'])
 
     def run(self):
         print('begin nlp service')

@@ -6,6 +6,7 @@ import io
 import re
 import requests
 import json
+import time
 from queue import Queue
 
 import vlc
@@ -22,11 +23,11 @@ from .nlp_service import ConversationProccessor, NLP_URL
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
-RECORD_SECONDS = 5
+RECORD_SECONDS = 7
 CHUNK_COUNT = RECORD_SECONDS*RATE/CHUNK
 SILENT_MESSAGE = 'Silent audio'
-TIMEOUT = 15
-MAX_SILENCES = TIMEOUT / RECORD_SECONDS
+TIMEOUT = 7
+MAX_SILENCES = int(TIMEOUT / RECORD_SECONDS)
 
 queue = Queue()
 
@@ -80,12 +81,13 @@ def nlp_task(stream):
     assert resp['status'] == 'ok'
 
     while True:
-        stream.start_stream()
-        print("* recording")
+        # stream.start_stream()
+        print("*** recording \n")
+        time.sleep(0.7)
         data = []
         for _ in range(int(CHUNK_COUNT)):
             data.append(stream.read(CHUNK))
-        stream.stop_stream()
+        # stream.stop_stream()
         samples = b''.join(data)
         print('done get data')
 
@@ -95,7 +97,7 @@ def nlp_task(stream):
             print('Exiting ...')
             break
         elif transcript == SILENT_MESSAGE:
-            if silent_count > MAX_SILENCES:
+            if silent_count >= MAX_SILENCES:
                 break
             silent_count += 1
             continue
@@ -103,8 +105,8 @@ def nlp_task(stream):
             conversator_task = ConversationProccessor(transcript)
             conversator_task.run()
 
-    stream.stop_stream()
-    stream.close()
+    # stream.stop_stream()
+    # stream.close()
 
 
 if __name__ == "__main__":

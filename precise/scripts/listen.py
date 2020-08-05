@@ -67,8 +67,9 @@ class ListenScript(BaseScript):
     def on_activation(self):
         activate_notify()
         # self.event.set()
-        nlp_task()
+        nlp_task(self.runner.stream)
         # self.event.set()
+        # self.runner.stream.start_stream()
 
         if self.args.save_dir:
             nm = join(self.args.save_dir, self.args.save_prefix + self.session_id + '.' + str(self.chunk_num) + '.wav')
