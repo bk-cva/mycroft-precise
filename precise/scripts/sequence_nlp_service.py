@@ -26,7 +26,7 @@ CHUNK = int(RATE / 10)  # 100ms
 RECORD_SECONDS = 7
 CHUNK_COUNT = RECORD_SECONDS*RATE/CHUNK
 SILENT_MESSAGE = 'Silent audio'
-TIMEOUT = 7
+TIMEOUT = 6
 MAX_SILENCES = int(TIMEOUT / RECORD_SECONDS)
 
 queue = Queue()
@@ -65,7 +65,7 @@ def sample_recognize(content):
     for result in response.results:
         # First alternative is the most probable result
         alternative = result.alternatives[0]
-        print(u"Transcript: {}".format(alternative.transcript))
+        # print(u"Transcript: {}".format(alternative.transcript))
         return alternative.transcript
 
     return SILENT_MESSAGE
@@ -93,7 +93,8 @@ def nlp_task(stream):
 
         # Speech to text
         transcript = sample_recognize(samples)
-        if re.search(r'\b(dừng|thoát|cám ơn|cảm ơn|ok)\b', transcript, re.I):
+        print(u"Transcript: {}".format(transcript))
+        if re.search(r'\b(dừng|thoát|cám ơn|cảm ơn)\b', transcript, re.I):
             print('Exiting ...')
             break
         elif transcript == SILENT_MESSAGE:
@@ -110,6 +111,7 @@ def nlp_task(stream):
 
 
 if __name__ == "__main__":
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './precise/scripts/Smart-Speaker-e00f3b0e6efb.json'
     pa = pyaudio.PyAudio()
     stream = pa.open(format=pyaudio.paInt16,
                      channels=1,
@@ -117,4 +119,12 @@ if __name__ == "__main__":
                      input=True,
                      output=False,
                      frames_per_buffer=CHUNK)
-    nlp_task(stream)
+    # nlp_task(stream)
+    data = []
+    for _ in range(int(CHUNK_COUNT)):
+        data.append(stream.read(CHUNK))
+    # stream.stop_stream()
+    samples = b''.join(data)
+    print('Done streamming')
+    transcript = sample_recognize(samples)
+    print(u"Transcript: {}".format(transcript))
