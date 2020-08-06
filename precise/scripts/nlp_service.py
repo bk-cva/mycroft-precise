@@ -66,12 +66,12 @@ NLP_URL = 'http://118.69.144.206:5050/cva'
 
 
 class DeviceGPIO(Enum):
-    Aircon = 8
-    LeftWindow = 10
-    LeftDoor = 12
-    Radio = 36
-    RightWindow = 38
-    RightDoor = 40
+    Aircon = 36
+    LeftWindow = 38
+    LeftDoor = 40
+    Radio = 8
+    RightWindow = 10
+    RightDoor = 12
 
 
 # GPIO.setwarnings(False)    # Ignore warning for now
@@ -410,7 +410,6 @@ class ConversationProccessor():
                             self.response_json['metadata']['action_type'])
 
     def run(self):
-        print('begin nlp service')
         self._nlp_request()
         self._response_to_speech()
         self._play_music()
@@ -429,6 +428,6 @@ if __name__ == '__main__':
     # play_obj.wait_done()
     # print(nlp_response)
     # conversator_task = ConversationProccessor(utte)
-    # conversator_task.start()
+    # conversator_task.run()
 
 # [END speech_transcribe_infinite_streaming]
